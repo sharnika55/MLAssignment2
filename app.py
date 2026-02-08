@@ -1,17 +1,27 @@
 import streamlit as st
 import pandas as pd
 import joblib
-from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.metrics import (
+    classification_report,
+    confusion_matrix,
+    accuracy_score,
+    roc_auc_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    matthews_corrcoef
+)
 import seaborn as sns
 import matplotlib.pyplot as plt
 
+# -------------------- Caching --------------------
 @st.cache_resource
 def load_scaler():
     return joblib.load("model/scaler.pkl")
 
 @st.cache_resource
-def load_model(model_path):
-    return joblib.load(model_path)
+def load_model(path):
+    return joblib.load(path)
 
 # -------------------- Page Config --------------------
 st.set_page_config(
@@ -68,7 +78,7 @@ st.sidebar.info("""
 """)
 
 # -------------------- Main Logic --------------------
-if uploaded_file:
+if uploaded_file is not None:
     data = pd.read_csv(uploaded_file)
 
     st.subheader("📄 Dataset Preview")
@@ -90,11 +100,38 @@ if uploaded_file:
     X_scaled = scaler.transform(X)
 
     model = load_model(f"model/{MODEL_FILES[model_name]}")
+
+    # -------------------- Predictions --------------------
     y_pred = model.predict(X_scaled)
 
-    # -------------------- Results --------------------
-    st.markdown("## 📊 Model Evaluation")
+    if hasattr(model, "predict_proba"):
+        y_prob = model.predict_proba(X_scaled)[:, 1]
+        auc = roc_auc_score(y, y_prob)
+    else:
+        auc = None
 
+    # -------------------- Metrics --------------------
+    accuracy = accuracy_score(y, y_pred)
+    precision = precision_score(y, y_pred)
+    recall = recall_score(y, y_pred)
+    f1 = f1_score(y, y_pred)
+    mcc = matthews_corrcoef(y, y_pred)
+
+    # -------------------- Metric Cards --------------------
+    st.markdown("## 📈 Evaluation Metrics")
+
+    m1, m2, m3 = st.columns(3)
+
+    m1.metric("Accuracy", f"{accuracy:.4f}")
+    m1.metric("Precision", f"{precision:.4f}")
+
+    m2.metric("Recall", f"{recall:.4f}")
+    m2.metric("F1 Score", f"{f1:.4f}")
+
+    m3.metric("AUC Score", f"{auc:.4f}" if auc is not None else "N/A")
+    m3.metric("MCC", f"{mcc:.4f}")
+
+    # -------------------- Detailed Results --------------------
     col1, col2 = st.columns(2)
 
     with col1:
@@ -106,9 +143,17 @@ if uploaded_file:
         st.markdown("### 🔢 Confusion Matrix")
         cm = confusion_matrix(y, y_pred)
         fig, ax = plt.subplots()
-        sns.heatmap(cm, annot=True, fmt="d", cmap="YlGnBu",
-                    xticklabels=["Benign", "Malignant"],
-                    yticklabels=["Benign", "Malignant"], ax=ax)
+        sns.heatmap(
+            cm,
+            annot=True,
+            fmt="d",
+            cmap="YlGnBu",
+            xticklabels=["Benign", "Malignant"],
+            yticklabels=["Benign", "Malignant"],
+            ax=ax
+        )
+        ax.set_xlabel("Predicted")
+        ax.set_ylabel("Actual")
         st.pyplot(fig)
 
     st.success(f"✅ Prediction completed using **{model_name}**")
