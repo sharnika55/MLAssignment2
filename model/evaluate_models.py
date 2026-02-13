@@ -35,6 +35,17 @@ X_train, X_test, y_train, y_test = train_test_split(
 )
 
 # -----------------------------
+# 🔥 Save Test Data (MANDATORY FILE)
+# -----------------------------
+test_df = X_test.copy()
+test_df["diagnosis"] = y_test.map({1: "M", 0: "B"})
+
+test_data_path = os.path.join(BASE_DIR, "test_data.csv")
+test_df.to_csv(test_data_path, index=False)
+
+print("✅ test_data.csv saved successfully!")
+
+# -----------------------------
 # Load scaler
 # -----------------------------
 scaler = joblib.load(os.path.join(MODEL_DIR, "scaler.pkl"))
@@ -55,7 +66,8 @@ models = [
 results = []
 
 for name in models:
-    model = joblib.load(os.path.join(MODEL_DIR, f"{name}.pkl"))
+    model_path = os.path.join(MODEL_DIR, f"{name}.pkl")
+    model = joblib.load(model_path)
 
     y_pred = model.predict(X_test_scaled)
     y_prob = model.predict_proba(X_test_scaled)[:, 1]
@@ -71,7 +83,7 @@ for name in models:
     ])
 
 # -----------------------------
-# Results table
+# Print Results (For README table)
 # -----------------------------
 columns = [
     "Model",
@@ -84,4 +96,6 @@ columns = [
 ]
 
 results_df = pd.DataFrame(results, columns=columns)
+
+print("\n📊 Model Evaluation Results:\n")
 print(results_df)
